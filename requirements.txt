@@ -1,6 +1,4 @@
-flask==2.3.3
+Flask==2.3.3
 requests==2.31.0
 numpy==1.26.0
-openai>=2.8.0      # 👈 关键！必须 >=2.8.0
-litellm==1.82.4
-dashscope==1.19.0
+dashscope==1.19.0   # 👈 只保留这个，删掉 openai 和 litellm
