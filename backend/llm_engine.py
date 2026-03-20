@@ -1,30 +1,33 @@
 # backend/llm_engine.py
 import os
 import json
-from dashscope import Generation  # 👈 改回 dashscope
+from dashscope import Generation
 
 API_KEY = os.getenv("ARK_API_KEY")
 MODEL = os.getenv("VOLC_MODEL", "ep-20260320085554-f72dc")
 
+
 def chat_with_gold_data(messages):
-    """使用 DashScope 调用火山引擎大模型"""
-    # 构造工具
-    tools = [{
-        "type": "function",
-        "function": {
+    """使用 DashScope 调用火山引擎大模型（正确工具调用格式）"""
+    # ✅ 正确的 DashScope 工具格式
+    tools = [
+        {
             "name": "get_gold_market_data",
-            "description": "获取国际黄金(XAU/USD)的实时市场数据...",
-            "parameters": {"type": "object", "properties": {}, "required": []}
+            "description": "获取国际黄金(XAU/USD)的实时市场数据，包括价格、RSI、MACD等技术指标",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
         }
-    }]
+    ]
 
     try:
-        # 调用 DashScope
         response = Generation.call(
             model=MODEL,
             api_key=API_KEY,
             messages=messages,
-            tools=tools,
+            tools=tools,  # ✅ 直接传 tools 列表
             tool_choice="auto",
             result_format='message',
             max_tokens=300,
@@ -41,7 +44,7 @@ def chat_with_gold_data(messages):
                     from tools import get_gold_market_data
                     data = get_gold_market_data()
 
-                    # 构建工具响应
+                    # 构建工具响应（DashScope 要求 role="tool"）
                     tool_response_message = {
                         "role": "tool",
                         "content": json.dumps(data, ensure_ascii=False),
@@ -64,7 +67,7 @@ def chat_with_gold_data(messages):
                     else:
                         return f"二次调用失败: {final_response.code} - {final_response.message}"
 
-            return message.get('content', '无内容返回。')
+            return message.get('content', '我暂时无法回答，请稍后再试。')
         else:
             return f"DashScope 调用失败: {response.code} - {response.message}"
 
