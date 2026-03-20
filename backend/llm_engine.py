@@ -28,7 +28,7 @@ def chat_with_gold_data(messages):
             api_key=API_KEY,
             messages=messages,
             tools=tools,  # ✅ 直接传 tools 列表
-            tool_choice="auto",
+            tool_choice="required",
             result_format='message',
             max_tokens=300,
             temperature=0.1
