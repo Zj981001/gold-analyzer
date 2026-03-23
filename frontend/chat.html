@@ -112,20 +112,20 @@
       .message { padding: 12px; font-size: 0.95rem; }
     }
   </style>
-    <!-- PWA 支持 -->
-<link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#4A90E2">
-<link rel="apple-touch-icon" href="/icon-192.png">
+  <!-- PWA 支持 -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#4A90E2">
+  <link rel="apple-touch-icon" href="/icon-192.png">
 
-<!-- 注册 Service Worker -->
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js')
-        .catch(console.error);
-    });
-  }
-</script>
+  <!-- 注册 Service Worker -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .catch(console.error);
+      });
+    }
+  </script>
 </head>
 <body>
   <div class="container">
@@ -151,7 +151,7 @@
       msgDiv.className = `message ${isUser ? 'user' : 'bot'}`;
       msgDiv.textContent = text;
       chatBox.appendChild(msgDiv);
-      chatBox.scrollTop = chatBox.scrollHeight; // 自动滚动到底部
+      chatBox.scrollTop = chatBox.scrollHeight;
     }
 
     function showTyping() {
@@ -177,17 +177,31 @@
       showTyping();
 
       try {
+        // ✅ 关键修复：完整 headers + 正确 body
         const response = await fetch('/api/chat', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text })
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            messages: [
+              { role: "user", content: text }
+            ]
+          })
         });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
         const data = await response.json();
         hideTyping();
-        addMessage(data.response || '抱歉，我无法回答这个问题。');
+        addMessage(data.reply || '抱歉，我无法回答这个问题。');
       } catch (error) {
+        console.error("请求失败:", error);
         hideTyping();
-        addMessage('⚠️ 网络请求失败，请稍后再试。');
+        addMessage('⚠️ 请求失败：' + error.Message);
       }
     }
 
