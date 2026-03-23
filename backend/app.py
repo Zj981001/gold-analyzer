@@ -9,7 +9,7 @@ from tools import get_gold_market_data
 # 初始化Flask应用
 app = Flask(__name__, static_folder='../frontend')
 
-# 核心修复：增强CORS配置，适配Render跨域
+# 增强CORS配置，适配Render跨域
 CORS(app, resources={
     r"/api/*": {
         "origins": ["*"],  # 生产环境可改为你的Render域名
@@ -20,14 +20,28 @@ CORS(app, resources={
 })
 
 
-# 增加全局请求超时处理
+# 全局请求超时处理（用装饰器实现，而非app.run的timeout参数）
 @app.before_request
 def before_request():
     request.start_time = time.time()
 
 
+# 自定义请求超时装饰器
+def timeout_limit(seconds=10):
+    def decorator(f):
+        def wrapped(*args, **kwargs):
+            if (time.time() - request.start_time) > seconds:
+                return jsonify({"reply": "请求超时，请稍后重试"}), 408
+            return f(*args, **kwargs)
+
+        return wrapped
+
+    return decorator
+
+
 # ===================== API接口 =====================
 @app.route('/api/chat', methods=['POST'])
+@timeout_limit(10)  # 设置10秒超时
 def chat_api():
     try:
         # 限制请求大小
@@ -35,7 +49,7 @@ def chat_api():
             return jsonify({"reply": "请求体过大"}), 413
 
         # 解析JSON（宽松模式）
-        data = request.get_json(silent=True)  # 修复：silent=True避免解析失败抛异常
+        data = request.get_json(silent=True)  # 避免解析失败抛异常
         if not data:
             return jsonify({"reply": "请求体不是有效的JSON格式"}), 400
 
@@ -57,6 +71,7 @@ def chat_api():
 
 
 @app.route('/api/gold-data', methods=['GET'])
+@timeout_limit(10)  # 设置10秒超时
 def get_gold_data_api():
     """独立的金价数据接口"""
     try:
@@ -100,13 +115,11 @@ if __name__ == '__main__':
     else:
         print(f"✅ 预加载成功 | 当前金价: ${initial_data['current_price']}")
 
-    # 适配Render部署的端口配置
+    # 适配Render部署的端口配置（移除错误的timeout参数）
     port = int(os.environ.get('PORT', 8000))
-    # 核心修复：关闭debug模式，增加线程数，适配Render
     app.run(
         host='0.0.0.0',
         port=port,
         debug=False,
-        threaded=True,  # 启用多线程处理请求
-        timeout=10  # 请求超时时间
+        threaded=True  # 启用多线程处理请求
     )
