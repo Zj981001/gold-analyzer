@@ -3,115 +3,142 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>实时金价查询</title>
+    <title>实时金价查询工具</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; max-width: 800px; margin: 20px auto; padding: 0 20px; }
-        .chat-container { border: 1px solid #ddd; border-radius: 8px; padding: 20px; height: 600px; overflow-y: auto; margin-bottom: 20px; }
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .chat-container { height: 60vh; border: 1px solid #ccc; border-radius: 8px; padding: 10px; overflow-y: auto; margin-bottom: 20px; }
         .message { margin: 10px 0; padding: 10px; border-radius: 6px; max-width: 80%; }
-        .user-message { background: #007bff; color: white; margin-left: auto; }
-        .bot-message { background: #f1f1f1; color: #333; margin-right: auto; }
-        .typing { color: #666; font-style: italic; }
+        .assistant { background-color: #e9ecef; align-self: flex-start; }
+        .user { background-color: #007bff; color: white; align-self: flex-end; margin-left: auto; }
+        .error { background-color: #f8d7da; color: #721c24; }
         .input-area { display: flex; gap: 10px; }
-        #message-input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
-        #send-btn, #refresh-btn { padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        #refresh-btn { background: #28a745; }
-        .warning { color: #dc3545; font-weight: bold; }
+        input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+        .send-btn { background-color: #007bff; color: white; }
+        .refresh-btn { background-color: #28a745; color: white; }
+        .big-refresh-btn { width: 100%; background-color: #007bff; color: white; padding: 15px; font-size: 16px; margin: 10px 0; }
     </style>
 </head>
 <body>
     <h1>实时金价查询工具</h1>
     <div class="chat-container" id="chat-container"></div>
-
+    <button class="big-refresh-btn" onclick="refreshGoldDataDirect()">刷新最新金价</button>
     <div class="input-area">
-        <input type="text" id="message-input" placeholder="输入问题（如：当前金价是多少？）">
-        <button id="send-btn">发送</button>
-        <button id="refresh-btn">🔄 刷新最新金价</button>
+        <input type="text" id="user-input" placeholder="输入问题（如：当前金价是多少？）">
+        <button class="send-btn" onclick="sendMessage()">发送</button>
+        <button class="refresh-btn" onclick="refreshGoldDataDirect()">🔄 刷新最新金价</button>
     </div>
 
     <script>
-        const chatContainer = document.getElementById('chat-container');
-        const messageInput = document.getElementById('message-input');
-        const sendBtn = document.getElementById('send-btn');
-        const refreshBtn = document.getElementById('refresh-btn');
+        // 初始化消息列表
+        let messages = [
+            { role: "assistant", content: "你好！我可以为你查询实时国际金价（XAU/USD），包括当前价格、24小时高低点、RSI和MACD指标。" }
+        ];
 
-        // 添加消息到聊天窗口
-        function addMessage(text, isUser = false) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = isUser ? 'message user-message' : 'message bot-message';
-
-            // 解析警告信息并高亮
-            if (text.includes('⚠️')) {
-                text = text.replace('⚠️', '<span class="warning">⚠️</span>');
-                messageDiv.innerHTML = text;
-            } else {
-                messageDiv.textContent = text;
-            }
-
-            chatContainer.appendChild(messageDiv);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
+        // 渲染消息到页面
+        function renderMessages() {
+            const container = document.getElementById('chat-container');
+            container.innerHTML = '';
+            messages.forEach(msg => {
+                const div = document.createElement('div');
+                div.className = `message ${msg.role} ${msg.error ? 'error' : ''}`;
+                div.textContent = msg.content;
+                container.appendChild(div);
+            });
+            // 滚动到底部
+            container.scrollTop = container.scrollHeight;
         }
 
-        // 显示/隐藏正在输入
-        function showTyping() {
-            const typingDiv = document.createElement('div');
-            typingDiv.id = 'typing';
-            typingDiv.className = 'typing';
-            typingDiv.textContent = '正在查询最新金价...';
-            chatContainer.appendChild(typingDiv);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-
-        function hideTyping() {
-            const typingDiv = document.getElementById('typing');
-            if (typingDiv) typingDiv.remove();
-        }
-
-        // 发送消息请求
-        async function sendMessage(content) {
-            if (!content.trim()) return;
+        // 发送消息到后端API
+        async function sendMessage() {
+            const input = document.getElementById('user-input');
+            const content = input.value.trim();
+            if (!content) return;
 
             // 添加用户消息
-            addMessage(content, true);
-            messageInput.value = '';
-
-            // 显示加载状态
-            showTyping();
+            messages.push({ role: "user", content });
+            renderMessages();
+            input.value = '';
 
             try {
+                // 核心修复：使用相对路径，适配Render部署的域名
                 const response = await fetch('/api/chat', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ messages: [{ role: 'user', content }] })
+                    headers: {
+                        'Content-Type': 'application/json',
+                        // 修复跨域：添加必要的请求头
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ messages: messages }),
+                    // 修复网络超时：增加超时时间
+                    timeout: 10000
                 });
 
-                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(`HTTP错误：${response.status} ${response.statusText}`);
+                }
 
-                // 隐藏加载状态并显示结果
-                hideTyping();
-                addMessage(data.reply || '查询失败，请稍后重试');
+                const data = await response.json();
+                // 添加助手回复
+                messages.push({ role: "assistant", content: data.reply });
+                renderMessages();
+
             } catch (error) {
-                // 修复：error.message 拼写错误（原错误为error.Message）
-                hideTyping();
-                console.error('请求失败:', error);
-                addMessage(`⚠️ 请求失败：${error.message}`);
+                console.error('发送消息失败：', error);
+                // 友好的错误提示
+                const errorMsg = `⚠️ 请求失败：${error.message || '网络异常，请检查服务是否正常'}`;
+                messages.push({ role: "assistant", content: errorMsg, error: true });
+                renderMessages();
             }
         }
 
-        // 刷新最新金价
-        function refreshGoldData() {
-            sendMessage('刷新最新金价');
+        // 直接刷新金价数据
+        async function refreshGoldDataDirect() {
+            try {
+                // 核心修复：调用独立的金价接口
+                const response = await fetch('/api/gold-data', {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    },
+                    timeout: 10000
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP错误：${response.status} ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                // 格式化金价回复
+                const reply = `📈 实时国际金价（XAU/USD）
+当前价格：$${data.current_price}
+24小时最高：$${data.high_24h} | 24小时最低：$${data.low_24h}
+RSI(14)：${data.rsi_14} | MACD：${data.macd}
+数据时间：${data.timestamp} | 数据延迟：${data.data_delay_minutes}分钟
+${data.warning || ''}`;
+
+                messages.push({ role: "assistant", content: reply });
+                renderMessages();
+
+            } catch (error) {
+                console.error('刷新金价失败：', error);
+                const errorMsg = `⚠️ 刷新金价失败：${error.message || '网络异常，请稍后重试'}`;
+                messages.push({ role: "assistant", content: errorMsg, error: true });
+                renderMessages();
+            }
         }
 
-        // 绑定事件
-        sendBtn.addEventListener('click', () => sendMessage(messageInput.value));
-        refreshBtn.addEventListener('click', refreshGoldData);
-        messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendMessage(messageInput.value);
+        // 回车发送消息
+        document.getElementById('user-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
         });
 
-        // 初始化欢迎语
-        addMessage('你好！我可以为你查询实时国际金价（XAU/USD），包括当前价格、24小时高低点、RSI和MACD指标。');
+        // 初始化渲染
+        renderMessages();
     </script>
 </body>
 </html>
