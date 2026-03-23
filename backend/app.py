@@ -1,10 +1,12 @@
 # backend/app.py
 from flask import Flask, request, jsonify, send_from_directory
+from flask_cors import CORS  # 👈 新增：CORS 支持
 import os
 from llm_engine import chat_with_gold_data
 from tools import get_gold_market_data
 
 app = Flask(__name__, static_folder='../frontend')
+CORS(app)  # 👈 启用 CORS，允许前端跨域请求
 
 
 @app.route('/api/chat', methods=['POST'])
@@ -42,7 +44,8 @@ def icons(filename):
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8000)))
-
     print("⏳ 预加载黄金行情数据...")
-    get_gold_market_data()
+    get_gold_market_data()  # 👈 提前预加载，确保首次调用更快
+
+    port = int(os.environ.get('PORT', 8000))
+    app.run(host='0.0.0.0', port=port)
