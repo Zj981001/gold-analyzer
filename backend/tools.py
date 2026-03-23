@@ -1,39 +1,24 @@
 # backend/tools.py
 import requests
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime
 import os
 
 TWELVE_API_KEY = os.getenv("TWELVE_API_KEY")
 
-# 全局缓存变量
-_cached_data = None
-_cache_time = None
-CACHE_TTL = 60  # 缓存60秒
-
 
 def get_gold_market_data():
-    """获取国际金价(XAU/USD)并计算技术指标（带缓存）"""
-    global _cached_data, _cache_time
-
-    now = datetime.now()
-
-    # 如果缓存有效，直接返回
-    if _cached_data and _cache_time and (now - _cache_time).total_seconds() < CACHE_TTL:
-        print("✅ 使用缓存数据")
-        return _cached_data.copy()
-
+    """获取国际金价(XAU/USD)并计算技术指标（无缓存，每次实时）"""
     try:
         symbol = "XAU/USD"
         interval = "1h"
-
-        # 获取最近 20 根 K线（用于 RSI）
-        kline_url = f"https://api.twelvedata.com/time_series?symbol={symbol}&interval={interval}&outputsize=20&apikey={TWELVE_API_KEY}"
-        response = requests.get(kline_url, timeout=5)  # ⏱️ 超时缩短到5秒
+        # 获取最近 26 根 K线（用于 MACD）
+        kline_url = f"https://api.twelvedata.com/time_series?symbol={symbol}&interval={interval}&outputsize=26&apikey={TWELVE_API_KEY}"
+        response = requests.get(kline_url, timeout=5)
         kline = response.json()
 
-        if 'values' not in kline or len(kline['values']) < 14:
-            return {"error": "数据不足"}
+        if 'values' not in kline or len(kline['values']) < 26:
+            return {"error": "K线数据不足，无法计算指标"}
 
         prices = [float(v['close']) for v in kline['values']]
         latest_price = prices[-1]
@@ -67,17 +52,15 @@ def get_gold_market_data():
             "macd": round(macd_line, 2),
             "macd_signal": round(signal_line, 2),
             "macd_hist": round(macd_hist, 2),
-            "timestamp": datetime.fromisoformat(kline['values'][-1]['datetime'].replace('Z', '+00:00')).strftime(
-                "%Y-%m-%d %H:%M UTC")
+            "timestamp": datetime.fromisoformat(
+                kline['values'][-1]['datetime'].replace('Z', '+00:00')
+            ).strftime("%Y-%m-%d %H:%M UTC")
         }
 
-        # 更新缓存
-        _cached_data = data
-        _cache_time = now
-        print("🔄 刷新行情缓存")
-
-        return data.copy()
+        print("📊 实时行情:", data)
+        return data
 
     except Exception as e:
-        print(f"🚨 获取数据异常: {str(e)}")
-        return {"error": f"数据获取异常: {str(e)}"}
+        error_msg = f"数据获取异常: {str(e)}"
+        print(f"🚨 {error_msg}")
+        return {"error": error_msg}

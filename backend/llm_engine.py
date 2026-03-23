@@ -19,7 +19,7 @@ def chat_with_gold_data(messages):
             "type": "function",
             "function": {
                 "name": "get_gold_market_data",
-                "description": "获取国际黄金(XAU/USD)的实时市场数据...",
+                "description": "获取国际黄金(XAU/USD)的实时市场数据，包含当前价格、24小时高低点、RSI、MACD等技术指标。",
                 "parameters": {
                     "type": "object",
                     "properties": {},
@@ -35,7 +35,7 @@ def chat_with_gold_data(messages):
             model=MODEL,
             messages=messages,
             tools=tools,
-            tool_choice="auto",  # ✅ OpenAI 支持 auto
+            tool_choice="auto",
             max_tokens=300,
             temperature=0.1
         )
@@ -43,11 +43,11 @@ def chat_with_gold_data(messages):
         response_message = response.choices[0].message
 
         # 检查是否需要调用工具
-        if response_message.tool_calls:
+        if hasattr(response_message, 'tool_calls') and response_message.tool_calls:
             tool_call = response_message.tool_calls[0]
             if tool_call.function.name == "get_gold_market_data":
                 from tools import get_gold_market_data
-                data = get_gold_market_data()
+                data = get_gold_market_data()  # ✅ 每次都实时获取！
 
                 # 构建工具响应
                 tool_response_message = {
